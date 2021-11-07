@@ -6,5 +6,6 @@ This repository contains:
 2. The profile and log-derivative results shown in Anbajagane+ 2021
 
 
-# tSZ theory Model
+## tSZ Theory Model
 
+## tSZ Observational Results
