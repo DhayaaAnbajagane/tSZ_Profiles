@@ -50,6 +50,7 @@ We also provide the results/curves shown in the Figures of Anbajagane+ 2021. The
 'High' and 'low' refer to 68% confidence interval bounds. The 1halo and 2halo terms are the individual components of the theory, with total = 1halo + 2halo. We take a log-derivative only of the total theory model. The individual 1halo/2halo terms were not provided for the mass/redshift dependence analysis (lowM, highM, lowZ, highZ).
 
 ```
+import h5py
 with h5py.File('Results.hdf5', 'r') as f:
 
     bins = np.array(f['Spt/bins_prof_data'])
