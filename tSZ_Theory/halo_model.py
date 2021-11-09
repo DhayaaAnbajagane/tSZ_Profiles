@@ -407,7 +407,14 @@ def Smoothed_Total_halo_model(cosmo, r, M, a, FWHM_arcmin, mass_def = None, Mode
         around.
 
     a : float
-        The cosmic scale factor
+        The cosmic scale factor.
+
+        Note: The input of a = 1 will cause the code to crash as
+        the angular diameter distance is then D_a(a = 1) = 0.
+        This is because the smoothing step requires the quantity 1/D_a,
+        which, at a = 1, becomes 1/D_a = infinity. One can simply replace
+        a = 1 with a = 0.999999 without any issue
+
 
     FWHM_arcmin : float
         The full-width half-max of a gaussian beam smoothing, in units of arcmin
