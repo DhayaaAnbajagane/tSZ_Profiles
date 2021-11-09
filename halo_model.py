@@ -3,6 +3,12 @@
 import pyccl as ccl
 import numpy as np
 
+#Define relevant physical constants
+Msun_to_Kg = ccl.physical_constants.SOLAR_MASS
+Mpc_to_m   = ccl.physical_constants.MPC_TO_METER
+G          = ccl.physical_constants.GNEWT / Mpc_to_m**3 * Msun_to_Kg
+m_to_cm    = 1e2
+
 #Just define some useful conversions/constants
 sigma_T = 6.652458e-29 / Mpc_to_m**2
 m_e     = 9.10938e-31 / Msun_to_Kg
@@ -135,12 +141,6 @@ class HaloProfileBattaglia(ccl.halos.profiles.HaloProfile):
 
         R = mass_def.get_radius(cosmo, M_use, a)/a #in comoving Mpc
         x = r_use[None, :]/R[:, None]
-
-        #Define relevant physical constants
-        Msun_to_Kg = ccl.physical_constants.SOLAR_MASS
-        Mpc_to_m   = ccl.physical_constants.MPC_TO_METER
-        G          = ccl.physical_constants.GNEWT / Mpc_to_m**3 * Msun_to_Kg
-        m_to_cm    = 1e2
 
         #The overdensity constrast related to the mass definition
         Delta    = mass_def.get_Delta(cosmo, a)
