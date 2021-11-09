@@ -8,4 +8,9 @@ This repository contains:
 
 ## tSZ Theory Model
 
+The theoretical one-halo and two-halo terms can be obtained from the code as:
+```
+
+```
+
 ## tSZ Observational Results
