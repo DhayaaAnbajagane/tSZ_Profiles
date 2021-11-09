@@ -8,7 +8,11 @@ This repository contains:
 
 ## Quickstart: tSZ Theory Model
 
-We provide code to compute the theoretical one-halo and two-halo terms shown in Anbajagane+ 2021.
+We provide code to compute the theoretical one-halo and two-halo terms shown in Anbajagane+ 2021. This code is fully
+consistent with the CCL framework, and so can be used to easily compute cross-correlations between tSZ and other
+probes (galaxy, matter etc.). It is also easy to swap the Battaglia+ 2012 pressure profile model used in this work
+with other existing models.
+
 ```
 import sys
 sys.path.append("<path to 'tSZ_Profiles'>/tSZ_Profiles")
