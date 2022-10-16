@@ -386,11 +386,11 @@ def Total_halo_model(cosmo, r, M, a, mass_def = None, Model_def = '500_SH', trun
 
 
 def Miscentering(P, r, f_miscen, tau_miscen, richness):
-    
-    #print(r)
-    #print(P)
-    profile_interp = interpolate.interp1d(np.log10(r), np.log10(P), bounds_error = False, fill_value = (np.NaN, np.log10(P[-1])))
-    R_mis = np.linspace(0, 5, 200)
+
+    profile_interp = interpolate.interp1d(np.log10(r), np.log10(P), bounds_error = False, fill_value = 'extrapolate')
+    sigma_R_mis    = tau_miscen * (richness/100)**0.2 / 0.7 #in Mpc units assuming h = 0.7
+
+    R_mis = np.linspace(0, 4*sigma_R_mis, 200) #Only numerically integrate up to 4*sigma
     theta = np.linspace(0, 2*np.pi, 100)
     Miscentered_distance = np.sqrt(r**2 + R_mis[:, None]**2 + 2*r*R_mis[:, None]*np.cos(theta)[:, None, None])
     Miscentered_profile  = 10**profile_interp(np.log10(Miscentered_distance))
@@ -402,13 +402,13 @@ def Miscentering(P, r, f_miscen, tau_miscen, richness):
     dtheta = theta[1] - theta[0]
 
     #print(Miscentered_profile.shape)
-    Marginalize_over_theta = np.sum(Miscentered_profile, axis = 0)*dtheta
+    Marginalize_over_theta = np.sum(Miscentered_profile, axis = 0)*dtheta/(2*np.pi)
     #print(Marginalize_over_theta.shape)
     Marginalize_over_R_mis = np.sum(Marginalize_over_theta * R_mis_prob[:, None], axis = 0)*dR_mis
     #print(Marginalize_over_R_mis.shape)
 
     Miscentered_profile = Marginalize_over_R_mis
-    
+
     #print(Miscentered_profile)
     Final_prof = P*(1 - f_miscen) + Miscentered_profile*f_miscen
 
