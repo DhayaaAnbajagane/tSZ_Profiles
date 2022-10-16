@@ -399,7 +399,10 @@ def Miscentering(P, r, f_miscen, tau_miscen, richness):
     dR_mis = R_mis[1] - R_mis[0]
     dtheta = theta[1] - theta[0]
 
-    Miscentered_profile = np.sum(np.sum(Miscentered_distance, axis = 2)*dtheta * R_mis_prob, axis  = 1)*dR_mis
+    Marginalize_over_theta = np.sum(Miscentered_distance, axis = 2)*dtheta
+    Marginalize_over_R_mis = np.sum(Marginalize_over_theta * R_mis_prob, axis  = 1)*dR_mis
+
+    Miscentered_profile = Marginalize_over_R_mis
 
     Final_prof = P*(1 - f_miscen) + Miscentered_profile*f_miscen
 
@@ -493,57 +496,42 @@ def Smoothed_Miscentered_Total_halo_model(cosmo, r, M, a, FWHM_arcmin,
     theta = r_for_smoothing*a/D_A #in radians
 
     # Convert to ell-space
-    l_one, Cl_one = ccl.pyutils._fftlog_transform(theta, one_halo, 2, 0, -1.5)
-    l_two, Cl_two = ccl.pyutils._fftlog_transform(theta, two_halo, 2, 0, -1.5)
+    l_tot, Cl_tot = ccl.pyutils._fftlog_transform(theta, tot_halo, 2, 0, -1.5)
 
     #Smooth via beam
     FWHM_rad    = FWHM_arcmin * 1/60 * np.pi/180
     sigma_beam  = FWHM_rad / np.sqrt(8 * np.log(2))
 
     #Compute the beam profile, B(ell)
-    Beam_l_one  = np.exp(-l_one*(l_one + 1)*sigma_beam**2/2)
-    Beam_l_two  = np.exp(-l_two*(l_two + 1)*sigma_beam**2/2)
+    Beam_l_tot  = np.exp(-l_tot*(l_tot + 1)*sigma_beam**2/2)
 
     #Convert back from ell space to angular space
-    theta_one, Xi_smoothed_one = ccl.pyutils._fftlog_transform(l_one, Cl_one * Beam_l_one, 2, 0, -1)
-    theta_two, Xi_smoothed_two = ccl.pyutils._fftlog_transform(l_two, Cl_two * Beam_l_two, 2, 0, -1)
+    theta_tot, Xi_smoothed_tot = ccl.pyutils._fftlog_transform(l_tot, Cl_tot * Beam_l_tot, 2, 0, -1)
 
     #get the radial scale of each smoothed Corr Func value
-    output_r_one = theta_one * D_A / a
-    output_r_two = theta_two * D_A / a
+    output_r_tot = theta_tot * D_A / a
 
-    Xi_one = np.zeros([M_use.size, r_use.size])
-    Xi_two = np.zeros([M_use.size, r_use.size])
+    Xi_tot = np.zeros([M_use.size, r_use.size])
 
     ln_r_use = np.log(r_use)
 
-    if np.ndim(Xi_smoothed_one) == 1: Xi_smoothed_one = Xi_smoothed_one[None, :]
-    if np.ndim(Xi_smoothed_two) == 1: Xi_smoothed_two = Xi_smoothed_two[None, :]
+    if np.ndim(Xi_smoothed_tot) == 1: Xi_smoothed_tot = Xi_smoothed_tot[None, :]
 
-    ln_output_r = np.log(output_r_one)
+    ln_output_r = np.log(output_r_tot)
 
     #Interpolate to get Xi are correct radii.
-    for im, output_Xi in enumerate(Xi_smoothed_one):
+    for im, output_Xi in enumerate(Xi_smoothed_tot):
         # Resample into input r_t values
-        Xi_one[im, :] = ccl.pyutils.resample_array(ln_output_r, output_Xi, ln_r_use, 'linx_liny', 'linx_liny', 0, 0)
-
-
-    ln_output_r = np.log(output_r_two)
-    for im, output_Xi in enumerate(Xi_smoothed_two):
-        # Resample into input r_t values
-        Xi_two[im, :] = ccl.pyutils.resample_array(ln_output_r, output_Xi, ln_r_use, 'linx_liny', 'linx_liny', 0, 0)
-
+        Xi_tot[im, :] = ccl.pyutils.resample_array(ln_output_r, output_Xi, ln_r_use, 'linx_liny', 'linx_liny', 0, 0)
 
     if np.ndim(r) == 0:
-        Xi_one = np.squeeze(Xi_one, axis=-1)
-        Xi_two = np.squeeze(Xi_two, axis=-1)
+        Xi_tot = np.squeeze(Xi_tot, axis=-1)
 
     if np.ndim(M) == 0:
-        Xi_one = np.squeeze(Xi_one, axis=0)
-        Xi_two = np.squeeze(Xi_two, axis=0)
+        Xi_tot = np.squeeze(Xi_tot, axis=0)
 
     #Factor of (2*np.pi)**2 comes from the multiple fourier transformations
-    return (2*np.pi)**2 * Xi_one, (2*np.pi)**2 * Xi_two
+    return (2*np.pi)**2 * Xi_tot
 
 def Smoothed_Total_halo_model(cosmo, r, M, a, FWHM_arcmin,
                               mass_def = None, Model_def = '500_SH', truncate = False,
