@@ -385,6 +385,166 @@ def Total_halo_model(cosmo, r, M, a, mass_def = None, Model_def = '500_SH', trun
     return one_halo, two_halo
 
 
+def Miscentering(P, r, f_miscen, tau_miscen, richness):
+
+    profile_interp = interpolate.interp1d(np.log10(P), np.log10(r))
+    R_mis = np.linspace(0, 5, 100)
+    theta = np.linspace(0, 2*np.pi, 100)
+    Miscentered_distance = np.sqrt(r**2 + R_mis[:, None]**2 + 2*r*R_mis[:, None]*np.cos(theta)[:, None, None])
+    Miscentered_profile  = 10**profile_interp(np.log10(Miscentered_distance))
+
+    sigma_R_mis = tau_miscen * (richness/100)**0.2 / 0.7 #in Mpc units assuming h = 0.7
+    R_mis_prob  = R_mis/sigma_R_mis**2 * np.exp(-R_mis**2/2/sigma_R_mis**2)
+
+    dR_mis = R_mis[1] - R_mis[0]
+    dtheta = theta[1] - theta[0]
+
+    Miscentered_profile = np.sum(np.sum(Miscentered_distance, axis = 2)*dtheta * R_mis_prob, axis  = 1)*dR_mis
+
+    Final_prof = P*(1 - f_miscen) + Miscentered_profile*f_miscen
+
+    return Final_prof
+
+def Smoothed_Miscentered_Total_halo_model(cosmo, r, M, a, FWHM_arcmin,
+                                          mass_def = None, Model_def = '500_SH', truncate = False,
+                                          f_miscen = 0, tau_miscen = None, richness = None):
+
+    '''
+    Compute a beam-smoothed version of the one halo and two halo
+    terms given set of halo masses and radii.
+
+    ------------------
+    Params:
+    ------------------
+
+    cosmo : pyccl.Cosmology object
+        A CCL cosmology object that contains the relevant
+        cosmological parameters
+
+    r : float, numpy array, list
+        radius (in comoving Mpc) to evaluate the spectrum at.
+
+    M : float, numpy array, list
+        The list of halo masses (in Msun) to compute the cross power spectrum
+        around.
+
+    a : float
+        The cosmic scale factor.
+
+        Note: The input of a = 1 will cause the code to crash as
+        the angular diameter distance is then D_a(a = 1) = 0.
+        This is because the smoothing step requires the quantity 1/D_a,
+        which, at a = 1, becomes 1/D_a = infinity. One can simply replace
+        a = 1 with a = 0.999999 without any issue
+
+
+    FWHM_arcmin : float
+        The full-width half-max of a gaussian beam smoothing, in units of arcmin
+
+    mass_def : ccl.halos.massdef.MassDef object
+        The mass definition associated with the input, M
+
+    Model_def : str
+        The available mode calibrations from Battaglia+ 2012.
+        Can be one of '200_AGN', '500_AGN', and '500_SH'. The former
+        two were calibrated using simulations w/ AGN feedback, whereas
+        the latter did not. The initial three-digit number denoted the
+        spherical overdensity definition used in the calibration (Either
+        M200c or M500c).
+
+    truncate : float
+        The radius (in units of R/Rdef, where Rdef is the halo radius defined
+        via some chosen spherical overdensity definition) at which to cutoff
+        the profiles and set them to zero. Default is False.
+
+    f_miscen : float
+        Fraction of halos that are miscentered in this sample. If 0, then
+        no miscentering is applied. Else, apply it similar to 1702.01722.
+
+    tau_miscen : float, optional
+        Parameter of the miscentering model used in 1702.01722
+
+    richness : float, optional
+        Cluster richness. Needed only if f_miscen != 0 and
+        miscentering must be applied. Part of model in 1702.01722
+
+    ------------------
+    Output:
+    ------------------
+
+    numpy array :
+        An array of size (M.size, R.size) that contains the one halo term
+        of the halo pressure cross spectrum at distance R, for each
+        cluster in array M.
+    '''
+
+    M_use = np.atleast_1d(M)
+    r_use = np.atleast_1d(r)
+
+    #Need this because we are transforming to fourier space
+    r_for_smoothing    = np.geomspace(1e-4, 1e4, 1000)
+    one_halo, two_halo = Total_halo_model(cosmo, r_for_smoothing, M, a, mass_def, Model_def, truncate)
+
+    tot_halo = one_halo + two_halo
+    tot_halo = Miscentering(tot_halo, r_for_smoothing, f_miscen, tau_miscen, richness)
+
+    #Convert to angular space
+    D_A   = ccl.background.angular_diameter_distance(cosmo, a)
+    theta = r_for_smoothing*a/D_A #in radians
+
+    # Convert to ell-space
+    l_one, Cl_one = ccl.pyutils._fftlog_transform(theta, one_halo, 2, 0, -1.5)
+    l_two, Cl_two = ccl.pyutils._fftlog_transform(theta, two_halo, 2, 0, -1.5)
+
+    #Smooth via beam
+    FWHM_rad    = FWHM_arcmin * 1/60 * np.pi/180
+    sigma_beam  = FWHM_rad / np.sqrt(8 * np.log(2))
+
+    #Compute the beam profile, B(ell)
+    Beam_l_one  = np.exp(-l_one*(l_one + 1)*sigma_beam**2/2)
+    Beam_l_two  = np.exp(-l_two*(l_two + 1)*sigma_beam**2/2)
+
+    #Convert back from ell space to angular space
+    theta_one, Xi_smoothed_one = ccl.pyutils._fftlog_transform(l_one, Cl_one * Beam_l_one, 2, 0, -1)
+    theta_two, Xi_smoothed_two = ccl.pyutils._fftlog_transform(l_two, Cl_two * Beam_l_two, 2, 0, -1)
+
+    #get the radial scale of each smoothed Corr Func value
+    output_r_one = theta_one * D_A / a
+    output_r_two = theta_two * D_A / a
+
+    Xi_one = np.zeros([M_use.size, r_use.size])
+    Xi_two = np.zeros([M_use.size, r_use.size])
+
+    ln_r_use = np.log(r_use)
+
+    if np.ndim(Xi_smoothed_one) == 1: Xi_smoothed_one = Xi_smoothed_one[None, :]
+    if np.ndim(Xi_smoothed_two) == 1: Xi_smoothed_two = Xi_smoothed_two[None, :]
+
+    ln_output_r = np.log(output_r_one)
+
+    #Interpolate to get Xi are correct radii.
+    for im, output_Xi in enumerate(Xi_smoothed_one):
+        # Resample into input r_t values
+        Xi_one[im, :] = ccl.pyutils.resample_array(ln_output_r, output_Xi, ln_r_use, 'linx_liny', 'linx_liny', 0, 0)
+
+
+    ln_output_r = np.log(output_r_two)
+    for im, output_Xi in enumerate(Xi_smoothed_two):
+        # Resample into input r_t values
+        Xi_two[im, :] = ccl.pyutils.resample_array(ln_output_r, output_Xi, ln_r_use, 'linx_liny', 'linx_liny', 0, 0)
+
+
+    if np.ndim(r) == 0:
+        Xi_one = np.squeeze(Xi_one, axis=-1)
+        Xi_two = np.squeeze(Xi_two, axis=-1)
+
+    if np.ndim(M) == 0:
+        Xi_one = np.squeeze(Xi_one, axis=0)
+        Xi_two = np.squeeze(Xi_two, axis=0)
+
+    #Factor of (2*np.pi)**2 comes from the multiple fourier transformations
+    return (2*np.pi)**2 * Xi_one, (2*np.pi)**2 * Xi_two
+
 def Smoothed_Total_halo_model(cosmo, r, M, a, FWHM_arcmin,
                               mass_def = None, Model_def = '500_SH', truncate = False,
                               f_miscen = 0, tau_miscen = 0):
