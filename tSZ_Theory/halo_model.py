@@ -1,7 +1,7 @@
 #Import useful packages.
-#We only need two
 import pyccl as ccl
 import numpy as np
+from scipy import interpolate
 
 #Define relevant physical constants
 Msun_to_Kg = ccl.physical_constants.SOLAR_MASS
@@ -385,7 +385,9 @@ def Total_halo_model(cosmo, r, M, a, mass_def = None, Model_def = '500_SH', trun
     return one_halo, two_halo
 
 
-def Smoothed_Total_halo_model(cosmo, r, M, a, FWHM_arcmin, mass_def = None, Model_def = '500_SH', truncate = False):
+def Smoothed_Total_halo_model(cosmo, r, M, a, FWHM_arcmin,
+                              mass_def = None, Model_def = '500_SH', truncate = False,
+                              f_miscen = 0, tau_miscen = 0):
 
     '''
     Compute a beam-smoothed version of the one halo and two halo
@@ -434,6 +436,17 @@ def Smoothed_Total_halo_model(cosmo, r, M, a, FWHM_arcmin, mass_def = None, Mode
         The radius (in units of R/Rdef, where Rdef is the halo radius defined
         via some chosen spherical overdensity definition) at which to cutoff
         the profiles and set them to zero. Default is False.
+
+    f_miscen : float
+        Fraction of halos that are miscentered in this sample. If 0, then
+        no miscentering is applied. Else, apply it similar to 1702.01722.
+
+    tau_miscen : float, optional
+        Parameter of the miscentering model used in 1702.01722
+
+    lambda : float, optional
+        Cluster richness. Needed only if f_miscen != 0 and
+        miscentering must be applied. Part of model in 1702.01722
 
     ------------------
     Output:
