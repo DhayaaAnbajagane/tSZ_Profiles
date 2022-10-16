@@ -386,9 +386,11 @@ def Total_halo_model(cosmo, r, M, a, mass_def = None, Model_def = '500_SH', trun
 
 
 def Miscentering(P, r, f_miscen, tau_miscen, richness):
-
-    profile_interp = interpolate.interp1d(np.log10(P), np.log10(r))
-    R_mis = np.linspace(0, 5, 100)
+    
+    #print(r)
+    #print(P)
+    profile_interp = interpolate.interp1d(np.log10(r), np.log10(P), bounds_error = False, fill_value = (np.NaN, np.log10(P[-1])))
+    R_mis = np.linspace(0, 5, 200)
     theta = np.linspace(0, 2*np.pi, 100)
     Miscentered_distance = np.sqrt(r**2 + R_mis[:, None]**2 + 2*r*R_mis[:, None]*np.cos(theta)[:, None, None])
     Miscentered_profile  = 10**profile_interp(np.log10(Miscentered_distance))
@@ -399,13 +401,18 @@ def Miscentering(P, r, f_miscen, tau_miscen, richness):
     dR_mis = R_mis[1] - R_mis[0]
     dtheta = theta[1] - theta[0]
 
-    Marginalize_over_theta = np.sum(Miscentered_distance, axis = 2)*dtheta
-    Marginalize_over_R_mis = np.sum(Marginalize_over_theta * R_mis_prob, axis  = 1)*dR_mis
+    #print(Miscentered_profile.shape)
+    Marginalize_over_theta = np.sum(Miscentered_profile, axis = 0)*dtheta
+    #print(Marginalize_over_theta.shape)
+    Marginalize_over_R_mis = np.sum(Marginalize_over_theta * R_mis_prob[:, None], axis = 0)*dR_mis
+    #print(Marginalize_over_R_mis.shape)
 
     Miscentered_profile = Marginalize_over_R_mis
-
+    
+    #print(Miscentered_profile)
     Final_prof = P*(1 - f_miscen) + Miscentered_profile*f_miscen
 
+    #print(Final_prof)
     return Final_prof
 
 def Smoothed_Miscentered_Total_halo_model(cosmo, r, M, a, FWHM_arcmin,
@@ -485,7 +492,7 @@ def Smoothed_Miscentered_Total_halo_model(cosmo, r, M, a, FWHM_arcmin,
     r_use = np.atleast_1d(r)
 
     #Need this because we are transforming to fourier space
-    r_for_smoothing    = np.geomspace(1e-4, 1e4, 1000)
+    r_for_smoothing    = np.geomspace(1e-4, 1e2, 1000)
     one_halo, two_halo = Total_halo_model(cosmo, r_for_smoothing, M, a, mass_def, Model_def, truncate)
 
     tot_halo = one_halo + two_halo
